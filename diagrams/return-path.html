@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Return Current Paths</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>Where Does the Return Current Flow?</h1>
+    <p class="lede">Top view of a trace routed over a solid ground plane. The heat map shows return-current density <em>in the plane</em>.
+      At low frequency the return takes the path of least <b>resistance</b> (the direct line between the ground connections). At high frequency
+      it takes the path of least <b>inductance</b>: directly under the trace. Cut a slot in the plane and watch what happens.</p>
+  </header>
+  <div class="card">
+    <div class="controls">
+      <label>Frequency <span class="val" id="fv"></span><input type="range" id="f" min="1" max="9" step="0.01" value="7"></label>
+      <label>Trace height above plane h <span class="val" id="hv"></span><input type="range" id="h" min="0.1" max="1.6" step="0.01" value="0.2"></label>
+      <label style="flex-direction:row;align-items:center;gap:8px;min-width:0"><input type="checkbox" id="slot"> Slot in ground plane</label>
+    </div>
+    <canvas id="cv"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--copper)"></i>Signal trace (top layer)</span>
+      <span><i style="background:var(--accent)"></i>Return current density in plane (width exaggerated 5×)</span>
+      <span><i style="background:var(--bad)"></i>Slot / split in plane</span>
+    </div>
+    <div class="readout">
+      <div>Regime<b id="reg"></b></div>
+      <div>Share following the trace<b id="share"></b></div>
+      <div>Loop area (HF path)<b id="area"></b></div>
+      <div>≈ Loop inductance<b id="ind"></b></div>
+    </div>
+  </div>
+  <div class="insight"><b>Why:</b> the source must supply V = L·di/dt + I·R around the loop. When ωL ≫ R (above roughly 10–100 kHz for typical traces),
+    the current redistributes to minimize L, which means minimizing loop area. The smallest loop is the one where the return runs directly beneath the signal,
+    spread over roughly ±3h, with density ∝ 1/(1+(x/h)²).</div>
+  <div class="insight warn"><b>The slot:</b> the return current can't cross the gap, so it detours around the end of the slot. The loop area,
+    inductance and radiated field all go up, and the slot itself radiates. This is why you never route a fast signal across a split plane. If a
+    signal must cross a gap, put a stitching capacitor across the gap right next to the trace.</div>
+</main>
+<script src="plot.js"></script>
+<script>
+const { fmt, css, onTheme } = PCB;
+const $ = id => document.getElementById(id);
+const cv = $('cv'); let ctx, W, H, S;
+// Board coordinates in mm: 90 × 45
+const BW = 90, BH = 45;
+const trace = [[10, 32], [45, 32], [45, 12], [80, 12]];
+const srcGnd = [10, 36], loadGnd = [80, 16];
+const SLOT = { x: 62, y0: 4, y1: 27, w: 1.2 };
+function resize() {
+  const dpr = window.devicePixelRatio || 1; W = cv.clientWidth || 800; H = Math.round(W * BH / BW);
+  cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr; ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); S = W / BW;
+}
+function distSeg(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+  let t = L2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2 : 0; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+function distPath(p, path) { let d = 1e9; for (let i = 0; i < path.length - 1; i++) d = Math.min(d, distSeg(p, path[i], path[i + 1])); return d; }
+function polyArea(pts) { let a = 0; for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; a += x1 * y2 - x2 * y1; } return Math.abs(a) / 2; }
+function hexToRgb(c) {
+  const d = document.createElement('div'); d.style.color = c; document.body.appendChild(d);
+  const m = getComputedStyle(d).color.match(/\d+/g).map(Number); d.remove(); return m;
+}
+function draw() {
+  const f = 10 ** +$('f').value, h = +$('h').value, slot = $('slot').checked;
+  $('fv').textContent = fmt(f) + 'Hz'; $('hv').textContent = h.toFixed(2) + ' mm';
+  const fc = 2e4; // approximate R/L crossover for a few-cm trace over a plane
+  const hf = f * f / (f * f + fc * fc);
+  $('reg').textContent = hf > 0.9 ? 'Inductive (follows trace)' : hf < 0.1 ? 'Resistive (shortest path)' : 'Transition';
+  $('share').textContent = (hf * 100).toFixed(0) + ' %';
+  // HF path under trace, with a detour around the slot if present
+  let hfPath = trace;
+  if (slot) hfPath = [[10, 32], [45, 32], [45, 12], [SLOT.x - 1.5, 12], [SLOT.x - 1.5, SLOT.y1 + 1.5], [SLOT.x + 1.5, SLOT.y1 + 1.5], [SLOT.x + 1.5, 12], [80, 12]];
+  let lfPath = [loadGnd, srcGnd];
+  if (slot) lfPath = [loadGnd, [SLOT.x + 1.5, SLOT.y1 + 1.5], [SLOT.x - 1.5, SLOT.y1 + 1.5], srcGnd];
+  // Loop area between signal trace and HF return: base area = length × h (return directly below) + detour polygon
+  const len = 35 + 20 + 35;
+  const detour = slot ? polyArea([[SLOT.x - 1.5, 12], [SLOT.x - 1.5, SLOT.y1 + 1.5], [SLOT.x + 1.5, SLOT.y1 + 1.5], [SLOT.x + 1.5, 12]]) : 0;
+  const area = len * h + detour; // mm² (the detour loop is horizontal, approximated as a flat loop area)
+  $('area').textContent = area.toFixed(1) + ' mm²';
+  // Rough inductance: µ0·area/width-ish; use L ≈ µ0·h/w per length for the parallel part (w≈0.3mm) + loop inductance for detour
+  const Lpar = 4e-7 * Math.PI * (h / 0.3) * len * 1e-3 * 0.5; // H (rough, fringing-corrected ×0.5)
+  const Ldet = slot ? 4e-7 * Math.PI * Math.sqrt(detour * 1e-6) * 1.2 : 0; // H, loop of that area
+  $('ind').textContent = fmt(Lpar + Ldet) + 'H';
+
+  // heat map
+  const img = ctx.createImageData(Math.ceil(W), Math.ceil(H));
+  const [ar, ag, ab] = hexToRgb(css('--accent')), [pr, pg, pb] = hexToRgb(css('--panel')), [gr, gg, gb] = hexToRgb(css('--plane'));
+  const step = 3;
+  for (let py = 0; py < H; py += step) for (let px = 0; px < W; px += step) {
+    const p = [px / S, py / S];
+    const dh = distPath(p, hfPath), dl = distPath(p, lfPath);
+    const hfD = 1 / (1 + (dh / (h * 5)) ** 2); // spread drawn 5× wider than real so it is visible at board scale
+    const lfD = 1 / (1 + (dl / 8) ** 2); // resistive spreading is much wider
+    let v = hf * hfD + (1 - hf) * lfD;
+    let inSlot = slot && Math.abs(p[0] - SLOT.x) < SLOT.w / 2 && p[1] > SLOT.y0 && p[1] < SLOT.y1;
+    for (let yy = 0; yy < step; yy++) for (let xx = 0; xx < step; xx++) {
+      const X = px + xx, Y = py + yy; if (X >= img.width || Y >= img.height) continue;
+      const i = (Y * img.width + X) * 4;
+      if (inSlot) { img.data[i] = 201; img.data[i + 1] = 42; img.data[i + 2] = 42; img.data[i + 3] = 255; continue; }
+      // blend plane tint → accent by density
+      const base = [pr * 0.8 + gr * 0.2, pg * 0.8 + gg * 0.2, pb * 0.8 + gb * 0.2];
+      img.data[i] = base[0] + (ar - base[0]) * v; img.data[i + 1] = base[1] + (ag - base[1]) * v; img.data[i + 2] = base[2] + (ab - base[2]) * v; img.data[i + 3] = 255;
+    }
+  }
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // putImageData ignores transforms; draw at CSS scale via temporary canvas
+  const tmp = document.createElement('canvas'); tmp.width = img.width; tmp.height = img.height; tmp.getContext('2d').putImageData(img, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.drawImage(tmp, 0, 0);
+  // trace
+  ctx.strokeStyle = css('--copper'); ctx.lineWidth = Math.max(3, 0.6 * S); ctx.lineJoin = 'round';
+  ctx.beginPath(); trace.forEach(([x, y], i) => i ? ctx.lineTo(x * S, y * S) : ctx.moveTo(x * S, y * S)); ctx.stroke();
+  // source / load
+  ctx.fillStyle = css('--ink'); ctx.font = '13px system-ui';
+  ctx.fillRect(trace[0][0] * S - 18, trace[0][1] * S - 10, 16, 20); ctx.fillText('Driver', trace[0][0] * S - 20, trace[0][1] * S - 16);
+  ctx.fillRect(trace[3][0] * S + 2, trace[3][1] * S - 10, 16, 20); ctx.fillText('Load', trace[3][0] * S - 8, trace[3][1] * S - 16);
+  // ground vias
+  [srcGnd, loadGnd].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x * S, y * S, 5, 0, 7); ctx.fillStyle = css('--good'); ctx.fill(); });
+  ctx.fillStyle = css('--muted'); ctx.fillText('GND via', srcGnd[0] * S - 20, srcGnd[1] * S + 20); ctx.fillText('GND via', loadGnd[0] * S - 20, loadGnd[1] * S + 20);
+}
+function all() { resize(); draw(); }
+['f', 'h', 'slot'].forEach(id => $(id).addEventListener('input', draw));
+window.addEventListener('resize', all); onTheme(draw); all();
+</script>
+</body>
+</html>

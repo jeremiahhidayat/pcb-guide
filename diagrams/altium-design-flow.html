@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Altium Design Flow</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .stage { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .stage:hover, .stage.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .stage small { display: block; color: var(--muted); font-size: 12px; }
+  .stage b { font-size: 15px; }
+  .phase { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 6px; }
+  #detail h2 { margin-top: 0; }
+  #detail ul { padding-left: 20px; }
+  .gate { border-style: dashed; border-color: var(--accent-2); }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>The Altium Design Flow, End to End</h1>
+    <p class="lede">Click any stage for what you do there, the files and menus involved, and the check that gates the next stage.
+      Dashed boxes are <b>review gates</b>, where professional teams stop and have someone else look.</p>
+  </header>
+  <div id="flow"></div>
+  <div class="card" id="detail"></div>
+</main>
+<script>
+const PHASES = [
+  ['Define', [
+    ['req', 'Requirements', 'design-notes.md', 0],
+    ['block', 'Block diagram & power tree', 'paper / draw.io', 0],
+    ['rev1', 'Architecture review', 'gate', 1],
+  ]],
+  ['Capture', [
+    ['lib', 'Libraries', '.SchLib / .PcbLib / DbLib', 0],
+    ['sch', 'Schematic', '.SchDoc (hierarchical)', 0],
+    ['erc', 'Compile / ERC', 'Project » Validate', 0],
+    ['rev2', 'Schematic review', 'gate', 1],
+  ]],
+  ['Layout', [
+    ['eco', 'Update PCB (ECO)', 'Design » Update PCB', 0],
+    ['stack', 'Stackup & rules', 'Layer Stack Mgr, Rules', 0],
+    ['place', 'Placement', 'Rooms, unions, align', 0],
+    ['rev3', 'Placement review', 'gate', 1],
+    ['route', 'Routing & pours', 'Ctrl+W, polygons', 0],
+    ['drc', 'DRC', 'Tools » DRC', 0],
+    ['rev4', 'Layout review', 'gate', 1],
+  ]],
+  ['Release', [
+    ['out', 'Outputs (OutJob)', 'Gerber/ODB++, BOM, PnP', 0],
+    ['check', 'Independent check', 'Gerber viewer', 0],
+    ['rel', 'Release & order', 'git tag / Releaser', 0],
+    ['bring', 'Bring-up', 'bring-up log', 0],
+    ['ecr', 'Changes → Rev B', 'CHANGELOG', 0],
+  ]],
+];
+const D = {
+  req: ['Requirements', 'Write down what the board must do, in numbers: signal ranges, noise, bandwidth, rails and currents, size, environment, interfaces, cost, schedule.', ['Chapter 8.1', 'Template: projects/templates/design-notes-template.md'], 'Can you say what "done" means for each requirement?'],
+  block: ['Block diagram & power tree', 'Sketch every functional block and every power rail with its current. Pick key parts (MCU, ADC, regulators) and check availability.', ['Chapter 11.1 (power tree)', 'Chapter 27 (supply chain)'], 'Power budget adds up with ≥ 1.5× margin; key parts are in stock.'],
+  rev1: ['Architecture review', 'A 30-minute walk-through with a colleague. The cheapest place to catch a wrong ADC or an impossible thermal budget.', ['Chapter 23'], 'Reviewer comments tracked and closed.'],
+  lib: ['Libraries', 'Create or verify symbols and footprints. Use the IPC Compliant Footprint Wizard or the datasheet land pattern. Add MPN, datasheet, and 3D model.', ['Chapter 9', '(PcbLib) Tools » IPC Compliant Footprint Wizard', 'Manufacturer Part Search panel'], 'Footprint printed 1:1 and checked against the real part; pin mapping verified.'],
+  sch: ['Schematic', 'Hierarchical sheets, left-to-right signal flow, meaningful net names, decoupling next to each IC, design notes on the sheet. Use directives for net classes and diff pairs.', ['Chapter 8', 'Place » Directives » Parameter Set / Differential Pair'], 'Every part has a value, MPN, and justification.'],
+  erc: ['Compile / ERC', 'Project » Validate PCB Project. Read every message. Tune the connection matrix so remaining warnings are meaningful.', ['Project » Project Options » Error Reporting / Connection Matrix'], 'Zero unexplained errors and warnings.'],
+  rev2: ['Schematic review', 'Send PDF + design notes + BOM. Walk through by function (power, clocks, each interface).', ['checklists/schematic-review.md', 'File » Smart PDF'], 'All S1/S2 comments resolved.'],
+  eco: ['Update PCB (ECO)', 'Design » Update PCB Document. Validate changes first; red X = missing footprint or pin/pad mismatch.', ['Chapter 8.6'], 'ECO executes with no errors.'],
+  stack: ['Stackup & rules', 'Define the stackup with your fab\'s materials, impedance profiles, classes, and rules (clearance, width, vias, planes, mask, diff pairs, high-speed).', ['Chapter 7.5, 18', 'Design » Layer Stack Manager (D,K)', 'Design » Rules (D,R)'], 'Stackup matches fab quote; rules imported from your fab-class template.'],
+  place: ['Placement', 'Mechanical parts first, then zones, then critical parts and their support parts, then everything else. Follow current flow and signal flow.', ['Chapter 13.1', 'Tools » Component Placement', 'Align (A)'], 'Hot loops tiny, decoupling at pins, analog away from switching, connectors on one edge.'],
+  rev3: ['Placement review', 'Screenshots/3D + zones explained. Most layout problems are cheaper to fix here than after routing.', ['checklists/layout-review.md (placement section)'], 'Mechanical fit confirmed against enclosure STEP.'],
+  route: ['Routing & pours', 'Power and ground first, then critical nets (clocks, diff pairs, analog), then the rest. Pour planes, stitch ground, add teardrops.', ['Chapter 13, 16, 17', 'Ctrl+W, Route » Interactive Diff Pair Routing, Tools » Via Stitching'], 'No signal crosses a plane gap; stitching vias at layer changes.'],
+  drc: ['DRC', 'Tools » Design Rule Check. Fix violations; write specific rules for intentional exceptions instead of ignoring them.', ['Tools » Design Rule Check (T,D)'], 'Zero violations.'],
+  rev4: ['Layout review', 'Layer-by-layer PDFs or a web viewer link. Check SI/PI/EMC, DFM, silkscreen, and test access.', ['checklists/layout-review.md', 'Altium 365 web review / comments'], 'All comments closed.'],
+  out: ['Outputs (OutJob)', 'Gerber X2 or ODB++/IPC-2581, NC drill, IPC-356 netlist, BOM, pick-and-place, fab and assembly drawings, schematic PDF, STEP. DRC/ERC as validation outputs.', ['Chapter 25', 'File » New » Output Job File'], 'Generated from a clean, committed/tagged revision.'],
+  check: ['Independent check', 'Open the Gerbers in a different viewer. Check layers, outline, drill alignment, mask, paste, silk, PnP rotations, BOM MPNs.', ['checklists/fab-release.md'], 'A second person has seen the Gerbers.'],
+  rel: ['Release & order', 'Archive outputs under releases/rev-X, tag git, record the order. Never regenerate a released revision from modified files.', ['Chapter 28', 'Project » Project Releaser (A365)'], 'Release immutable and traceable.'],
+  bring: ['Bring-up', 'Inspect → resistance checks → current-limited power-up stage by stage → clocks → debug → peripherals → full system. Log everything.', ['Chapter 26', 'projects/02-sensor-daq-board/bringup_test.py'], 'Every rail and interface verified; issues logged with root cause.'],
+  ecr: ['Changes → Rev B', 'Turn every bring-up issue and rework into a changelog entry and a schematic/layout change. Update checklists with lessons learned.', ['Chapter 28.3'], 'Every bodge wire has a corresponding fix.'],
+};
+const flow = document.getElementById('flow');
+PHASES.forEach(([name, stages]) => {
+  flow.insertAdjacentHTML('beforeend', `<div class="phase">${name}</div>`);
+  const g = document.createElement('div'); g.className = 'flow';
+  stages.forEach(([id, t, s, gate], k) => g.insertAdjacentHTML('beforeend', `<div class="stage ${gate ? 'gate' : ''}" data-id="${id}"><b>${k + 1}. ${t}</b><small>${gate ? 'review gate' : s}</small></div>`));
+  flow.appendChild(g);
+});
+function show(id) {
+  const [t, d, refs, gate] = D[id];
+  document.getElementById('detail').innerHTML = `<h2>${t}</h2><p>${d}</p><b>Where / references</b><ul>${refs.map(r => `<li><code>${r}</code></li>`).join('')}</ul><div class="insight"><b>Exit criterion:</b> ${gate}</div>`;
+  document.querySelectorAll('.stage').forEach(s => s.classList.toggle('on', s.dataset.id === id));
+}
+document.querySelectorAll('.stage').forEach(s => s.onclick = () => show(s.dataset.id));
+show('req');
+</script>
+</body>
+</html>

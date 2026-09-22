@@ -1,0 +1,28 @@
+# ---- Altium Designer generated files ----
+History/
+__Previews/
+Project Logs for */
+Project Outputs for */
+*.PcbDoc.htm
+*.SchDocPreview
+*.PcbDocPreview
+*.PrjPcbStructure
+*.$$$
+*.~*
+~$*
+*.LOG
+*.bak
+.~lock.*
+# Keep released outputs: they live in releases/ and are committed on purpose.
+
+# ---- Python ----
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ---- Tooling / OS ----
+.playwright-mcp/
+.DS_Store
+Thumbs.db
+desktop.ini

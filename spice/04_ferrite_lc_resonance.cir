@@ -1,0 +1,34 @@
+* 04_ferrite_lc_resonance.cir — Ferrite bead + cap filter resonance, and how to damp it (Chapter 2)
+* A bead is inductive at low frequency (~1 uH here) and resistive at high frequency.
+* Bead model: L in parallel with (R_hf series C_par) plus DCR — simplified: DCR + (L || Rp) with Cp.
+* Output cap 10u ceramic (low ESR) → high-Q resonance → noise GAIN near f0 = 1/(2pi sqrt(LC)) ≈ 50 kHz.
+* Run: ngspice 04_ferrite_lc_resonance.cir
+
+.subckt bead a b
+Rdc a m 0.05
+Lb m b 1u
+Rp m b 600
+Cp m b 1p
+.ends
+
+* Undamped: bead + 10u ceramic
+V1 in1 0 AC 1
+X1 in1 out1 bead
+C1 out1 0 10u
+Resr1 out1 0 1g
+
+* Damped: add a lossy bulk cap (e.g. 47u electrolytic/polymer with 0.3 ohm ESR) in parallel
+V2 in2 0 AC 1
+X2 in2 out2 bead
+C2 out2 0 10u
+C2b out2 d2 47u
+R2b d2 0 0.3
+
+.control
+  ac dec 100 100 100meg
+  plot vdb(out1) vdb(out2) title 'Bead+cap transfer: undamped vs damped' ylabel 'dB'
+  meas ac peak_undamped MAX vdb(out1)
+  meas ac peak_damped MAX vdb(out2)
+  echo "Undamped peak >> 0 dB means the 'filter' AMPLIFIES noise near resonance."
+.endc
+.end

@@ -1,0 +1,33 @@
+* 03_decoupling_antiresonance.cir — Impedance of a decoupling network (Chapter 2, 14)
+* Drive the network with a 1 A AC current source: V(node) numerically equals |Z| in ohms.
+* Network A: 10u + 100n + 1n "ladder".  Network B: 10u + 4 x 100n (same value).
+* Each cap = ESR + ESL (mounted) + C.
+* Run: ngspice 03_decoupling_antiresonance.cir
+
+.subckt cap n1 n2 c=100n esl=0.8n esr=0.02
+R1 n1 a {esr}
+L1 a b {esl}
+C1 b n2 {c}
+.ends
+
+* --- Network A (ladder)
+IA 0 za AC 1
+XA1 za 0 cap c=10u  esl=1n   esr=0.005
+XA2 za 0 cap c=100n esl=0.8n esr=0.02
+XA3 za 0 cap c=10n  esl=0.8n esr=0.05
+XA4 za 0 cap c=1n   esl=0.8n esr=0.1
+
+* --- Network B (same value)
+IB 0 zb AC 1
+XB1 zb 0 cap c=10u  esl=1n   esr=0.005
+XB2 zb 0 cap c=100n esl=0.8n esr=0.02
+XB3 zb 0 cap c=100n esl=0.8n esr=0.02
+XB4 zb 0 cap c=100n esl=0.8n esr=0.02
+XB5 zb 0 cap c=100n esl=0.8n esr=0.02
+
+.control
+  ac dec 100 1k 1g
+  plot mag(v(za)) mag(v(zb)) loglog ylabel '|Z| (ohm)' title 'Ladder (za) vs same-value (zb)'
+  echo "Look for anti-resonance peaks in za between each SRF. Compare with diagrams/decoupling-impedance.html"
+.endc
+.end

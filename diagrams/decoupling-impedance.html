@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decoupling Impedance Explorer</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  table.caps { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.caps td, table.caps th { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+  table.caps input, table.caps select { width: 100%; font: inherit; font-size: 13px; padding: 3px 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink); }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>Decoupling Impedance Explorer</h1>
+    <p class="lede">Every real capacitor is a series R-L-C. Put several in parallel and the network impedance |Z(f)| has valleys at each
+      self-resonance and <b>anti-resonance peaks</b> between them. The PDN goal is to keep |Z| under the target impedance across the band
+      where your chip draws current.</p>
+  </header>
+  <div class="card">
+    <div class="controls">
+      <button data-preset="ladder">Classic 10µ + 100n + 10n + 1n</button>
+      <button data-preset="same">10µ + 4 × 100n (same value)</button>
+      <button data-preset="badmount">4 × 100n, long traces (2 nH mounted)</button>
+      <button data-preset="fpga">FPGA-ish bank + plane</button>
+      <button id="add">+ Add row</button>
+    </div>
+    <table class="caps" id="tbl"><thead><tr><th></th><th>Qty</th><th>Capacitance</th><th>Mounted ESL</th><th>ESR</th><th>SRF</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="controls" style="margin-top:12px">
+      <label>Target impedance <span class="val" id="ztv"></span><input type="range" id="zt" min="-3" max="0.5" step="0.01" value="-1"></label>
+      <label style="flex-direction:row;align-items:center;gap:8px;min-width:0"><input type="checkbox" id="each" checked> Show individual groups</label>
+    </div>
+  </div>
+  <div class="card"><canvas id="cv"></canvas>
+    <div class="legend"><span><i style="background:var(--ink)"></i>Total network |Z|</span><span><i style="background:var(--accent-2)"></i>Target impedance</span></div>
+  </div>
+  <div class="insight"><b>Try this:</b> load the "classic" ladder and look at the peaks between the SRFs. Then load "same value": four identical
+    caps lower both L and R without creating anti-resonances between themselves. Then load "long traces": the capacitance didn't change, but
+    above ~20 MHz everything got worse. <b>Mounted inductance is set by layout.</b></div>
+</main>
+<script src="plot.js"></script>
+<script>
+const { Plot, fmt, css, logspace, onTheme } = PCB;
+const $ = id => document.getElementById(id);
+const COLORS = ['#0b6bcb', '#d9480f', '#2b8a3e', '#ae3ec9', '#e67700', '#1098ad', '#c2255c', '#5c7cfa'];
+const plot = new Plot($('cv'), { xLog: true, yLog: true, xRange: [1e3, 1e9], yRange: [1e-3, 1e2], xLabel: 'Frequency (Hz)', yLabel: '|Z| (Ω)', aspect: 0.5 });
+const PRESETS = {
+  ladder: [[1, 10e-6, 1.0e-9, 0.005], [1, 100e-9, 0.8e-9, 0.02], [1, 10e-9, 0.8e-9, 0.05], [1, 1e-9, 0.8e-9, 0.1]],
+  same: [[1, 10e-6, 1.0e-9, 0.005], [4, 100e-9, 0.8e-9, 0.02]],
+  badmount: [[1, 10e-6, 3e-9, 0.005], [4, 100e-9, 2.0e-9, 0.02]],
+  fpga: [[2, 100e-6, 2e-9, 0.01], [4, 4.7e-6, 0.6e-9, 0.004], [10, 470e-9, 0.45e-9, 0.01], [1, 20e-9, 0.05e-9, 0.02]],
+};
+let rows = [];
+const parse = s => { const m = String(s).trim().match(/^([\d.eE+-]+)\s*([pnuµmk]?)/); if (!m) return NaN; return +m[1] * ({ p: 1e-12, n: 1e-9, u: 1e-6, µ: 1e-6, m: 1e-3, k: 1e3, '': 1 })[m[2]]; };
+function renderTable() {
+  const tb = $('tbl').querySelector('tbody'); tb.innerHTML = '';
+  rows.forEach((r, i) => {
+    const srf = 1 / (2 * Math.PI * Math.sqrt(r[1] * r[2]));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><span class="sw" style="background:${COLORS[i % 8]}"></span></td>
+      <td><input value="${r[0]}" data-i="${i}" data-k="0"></td>
+      <td><input value="${fmt(r[1])}F" data-i="${i}" data-k="1"></td>
+      <td><input value="${fmt(r[2])}H" data-i="${i}" data-k="2"></td>
+      <td><input value="${fmt(r[3])}Ω" data-i="${i}" data-k="3"></td>
+      <td>${fmt(srf)}Hz</td><td><button data-del="${i}">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
+    const v = inp.dataset.k === '0' ? parseInt(inp.value) : parse(inp.value.replace(/[FHΩ]/g, ''));
+    if (isFinite(v) && v > 0) rows[+inp.dataset.i][+inp.dataset.k] = v;
+    renderTable(); draw();
+  }));
+  tb.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { rows.splice(+b.dataset.del, 1); renderTable(); draw(); });
+}
+function zGroup(r, f) { // complex impedance of n identical caps in parallel
+  const w = 2 * Math.PI * f; return [r[3] / r[0], (w * r[2] - 1 / (w * r[1])) / r[0]];
+}
+function draw() {
+  const zt = 10 ** +$('zt').value; $('ztv').textContent = fmt(zt) + 'Ω';
+  const f = logspace(1e3, 1e9, 600);
+  plot.clear(); plot.axes();
+  if ($('each').checked) rows.forEach((r, i) => plot.line(f, f.map(x => Math.hypot(...zGroup(r, x))), COLORS[i % 8], 1.2, [4, 3]));
+  const tot = f.map(x => {
+    let yr = 0, yi = 0;
+    rows.forEach(r => { const [a, b] = zGroup(r, x); const d = a * a + b * b; yr += a / d; yi += -b / d; });
+    const d = yr * yr + yi * yi; return Math.hypot(yr / d, -yi / d);
+  });
+  plot.hline(zt, '--accent-2', [6, 4], 'Z_target');
+  plot.line(f, tot, '--ink', 2.5);
+}
+function load(p) { rows = PRESETS[p].map(r => r.slice()); renderTable(); draw(); }
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => load(b.dataset.preset));
+$('add').onclick = () => { rows.push([1, 1e-6, 0.7e-9, 0.01]); renderTable(); draw(); };
+['zt', 'each'].forEach(id => $(id).addEventListener('input', draw));
+plot.onResize = draw; onTheme(draw); load('ladder');
+</script>
+</body>
+</html>

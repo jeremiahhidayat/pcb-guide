@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCB Stackup Visualizer</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .layer:hover { filter: brightness(1.15); cursor: help; }
+  #info { min-height: 3.2em; }
+  table.st { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.st td, table.st th { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: left; }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>PCB Stackup Visualizer</h1>
+    <p class="lede">A cross-section through the board (vertical scale exaggerated). Pick a stackup, hover a layer to see what it
+      does and why it sits where it does, and toggle via types to see which layers each one connects.</p>
+  </header>
+  <div class="card">
+    <div class="controls">
+      <label>Stackup
+        <select id="stack">
+          <option value="2">2-layer, 1.6 mm</option>
+          <option value="4" selected>4-layer: Sig / GND / PWR / Sig</option>
+          <option value="4g">4-layer: Sig / GND / GND / Sig (EMC-friendly)</option>
+          <option value="6">6-layer: Sig / GND / Sig / PWR / GND / Sig</option>
+          <option value="8">8-layer: Sig / GND / Sig / PWR / GND / Sig / GND / Sig</option>
+        </select></label>
+      <label>Vias shown
+        <select id="vias">
+          <option value="through">Through-hole via</option>
+          <option value="all" selected>Through + blind + buried + microvia</option>
+          <option value="none">None</option>
+        </select></label>
+      <label style="flex-direction:row;align-items:center;gap:8px;min-width:0"><input type="checkbox" id="fields" checked> Show signal fields</label>
+    </div>
+    <svg id="svg" viewBox="0 0 900 420" role="img" aria-label="PCB cross-section"></svg>
+    <div class="insight" id="info">Hover a layer.</div>
+  </div>
+  <div class="card"><h2 style="margin-top:0">Layer table</h2><table class="st" id="table"></table></div>
+  <div class="insight"><b>Why the order matters:</b> each signal layer needs an adjacent reference plane (controlled impedance, and a return
+    path directly underneath). Power and ground close together give plane capacitance. The stack is mirrored about its center so it
+    doesn't warp. See Chapter 18.</div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const DESC = {
+  mask: 'Solder mask (~20 µm). Polymer that prevents solder bridges and protects copper. It also lowers microstrip impedance by 1–3 Ω.',
+  sig: 'Signal layer. Traces for signals. Needs an adjacent solid reference plane so that return currents flow directly underneath.',
+  gnd: 'Ground plane. The reference for adjacent signal layers and the return path for their currents. Keep it continuous, with no slots under signals.',
+  pwr: 'Power plane. Can also act as a reference (return current couples to GND through decoupling caps). Tight spacing to GND gives plane capacitance.',
+  prepreg: 'Prepreg. Glass cloth + partially cured resin that melts and bonds layers during lamination. Thin prepreg = tight coupling to the plane.',
+  core: 'Core. Fully cured laminate supplied with copper on both sides. Its thickness sets much of the board thickness.',
+};
+const STACKS = {
+  '2': [['sig', 'L1 Top — signal + parts'], ['core', 1.5], ['gnd', 'L2 Bottom — ground pour + few traces']],
+  '4': [['sig', 'L1 Top — signal'], ['prepreg', 0.2], ['gnd', 'L2 GND plane'], ['core', 1.0], ['pwr', 'L3 Power plane'], ['prepreg', 0.2], ['sig', 'L4 Bottom — signal']],
+  '4g': [['sig', 'L1 Top — signal'], ['prepreg', 0.2], ['gnd', 'L2 GND plane'], ['core', 1.0], ['gnd', 'L3 GND plane'], ['prepreg', 0.2], ['sig', 'L4 Bottom — signal + power pours']],
+  '6': [['sig', 'L1 Top — signal'], ['prepreg', 0.1], ['gnd', 'L2 GND'], ['core', 0.2], ['sig', 'L3 Stripline signal'], ['prepreg', 0.6], ['pwr', 'L4 Power'], ['core', 0.2], ['gnd', 'L5 GND'], ['prepreg', 0.1], ['sig', 'L6 Bottom — signal']],
+  '8': [['sig', 'L1 Top'], ['prepreg', 0.1], ['gnd', 'L2 GND'], ['core', 0.15], ['sig', 'L3 Stripline'], ['prepreg', 0.3], ['pwr', 'L4 PWR'], ['core', 0.1], ['gnd', 'L5 GND'], ['prepreg', 0.3], ['sig', 'L6 Stripline'], ['core', 0.15], ['gnd', 'L7 GND'], ['prepreg', 0.1], ['sig', 'L8 Bottom']],
+};
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; }
+function draw() {
+  const svg = $('svg'); svg.innerHTML = '';
+  const stack = STACKS[$('stack').value];
+  const COPPER_H = 12, MASK_H = 7, SCALE = 150; // px per mm for dielectrics (exaggerated copper)
+  // compute heights
+  const rows = [['mask', null]].concat(stack).concat([['mask', null]]);
+  let total = 0; const hs = rows.map(r => { const h = r[0] === 'mask' ? MASK_H : (r[0] === 'core' || r[0] === 'prepreg') ? Math.max(14, r[1] * SCALE) : COPPER_H; total += h; return h; });
+  const k = Math.min(1, 380 / total);
+  let y = 20; const X0 = 40, W = 560;
+  const copperY = [];
+  const table = $('table'); table.innerHTML = '<tr><th>Layer</th><th>Type</th><th>Thickness</th></tr>';
+  rows.forEach((r, i) => {
+    const h = hs[i] * k, type = r[0];
+    const g = el('g', { class: 'layer' }, svg);
+    let fill = { mask: 'var(--mask)', core: 'var(--fr4)', prepreg: 'var(--prepreg)' }[type] || 'none';
+    if (type === 'sig') {
+      el('rect', { x: X0, y, width: W, height: h, fill: 'var(--panel)', stroke: 'var(--line)' }, g);
+      [60, 150, 190, 330, 370, 470].forEach((tx, j) => el('rect', { x: X0 + tx, y, width: j % 3 === 1 ? 24 : 40, height: h, fill: 'var(--copper)' }, g));
+      copperY.push({ y, h, type, name: r[1] });
+    } else if (type === 'gnd' || type === 'pwr') {
+      el('rect', { x: X0, y, width: W, height: h, fill: type === 'gnd' ? 'var(--plane)' : 'var(--copper-light)' }, g);
+      copperY.push({ y, h, type, name: r[1] });
+    } else {
+      el('rect', { x: X0, y, width: W, height: h, fill }, g);
+    }
+    const label = type === 'mask' ? 'Solder mask' : r[0] === 'core' || r[0] === 'prepreg' ? `${type === 'core' ? 'Core' : 'Prepreg'} ${r[1]} mm` : r[1];
+    if (type !== 'mask') { const t = el('text', { x: X0 + W + 14, y: y + h / 2 + 4, 'font-size': 13 }, g); t.textContent = label; }
+    g.addEventListener('mouseenter', () => { $('info').innerHTML = `<b>${label}</b> — ${DESC[type]}`; });
+    if (type !== 'mask') table.insertAdjacentHTML('beforeend', `<tr><td>${label}</td><td>${type}</td><td>${type === 'core' || type === 'prepreg' ? r[1] + ' mm' : '35 µm (1 oz)'}</td></tr>`);
+    y += h;
+  });
+  svg.setAttribute('viewBox', `0 0 900 ${Math.ceil(y + 34)}`);
+  // fields: arcs from top trace to L2
+  if ($('fields').checked && copperY.length > 1) {
+    const a = copperY[0], b = copperY[1];
+    for (let i = 1; i <= 4; i++) {
+      el('path', { d: `M ${X0 + 80} ${a.y + a.h} C ${X0 + 80 - i * 14} ${a.y + a.h + i * 6}, ${X0 + 80 - i * 18} ${b.y}, ${X0 + 80 - i * 22} ${b.y}`, stroke: 'var(--accent)', fill: 'none', 'stroke-width': 1.2, opacity: 0.8 }, svg);
+      el('path', { d: `M ${X0 + 80} ${a.y + a.h} C ${X0 + 80 + i * 14} ${a.y + a.h + i * 6}, ${X0 + 80 + i * 18} ${b.y}, ${X0 + 80 + i * 22} ${b.y}`, stroke: 'var(--accent)', fill: 'none', 'stroke-width': 1.2, opacity: 0.8 }, svg);
+    }
+    const t = el('text', { x: X0 + W - 4, y: 14, 'font-size': 12, fill: 'var(--accent)', 'text-anchor': 'end' }, svg); t.textContent = 'blue arcs: E-field from an L1 trace to its reference plane';
+  }
+  // vias
+  const mode = $('vias').value;
+  if (mode !== 'none' && copperY.length) {
+    const top = copperY[0], bot = copperY[copperY.length - 1];
+    const drawVia = (x, from, to, label, w = 14) => {
+      const y1 = from.y, y2 = to.y + to.h;
+      el('rect', { x: x - w / 2, y: y1, width: w, height: y2 - y1, fill: 'var(--copper)', opacity: 0.95 }, svg);
+      el('rect', { x: x - w / 2 + 3, y: y1, width: w - 6, height: y2 - y1, fill: 'var(--panel)' }, svg);
+      const t = el('text', { x, y: Math.min(415, y2 + 16), 'font-size': 11, 'text-anchor': 'middle', fill: 'var(--muted)' }, svg); t.textContent = label;
+    };
+    drawVia(X0 + 250, top, bot, 'through via');
+    if (mode === 'all' && copperY.length >= 4) {
+      drawVia(X0 + 420, top, copperY[2], 'blind');
+      drawVia(X0 + 510, copperY[1], copperY[copperY.length - 2], 'buried');
+      // microvia: laser cone L1->L2
+      const a = copperY[0], b = copperY[1];
+      el('path', { d: `M ${X0 + 115} ${a.y} L ${X0 + 125} ${b.y} L ${X0 + 131} ${b.y} L ${X0 + 141} ${a.y} Z`, fill: 'var(--copper)' }, svg);
+      const t = el('text', { x: X0 + 128, y: a.y - 4, 'font-size': 11, 'text-anchor': 'middle', fill: 'var(--muted)' }, svg); t.textContent = 'microvia';
+    }
+  }
+}
+['stack', 'vias', 'fields'].forEach(id => $(id).addEventListener('input', draw));
+draw();
+</script>
+</body>
+</html>

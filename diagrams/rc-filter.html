@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RC Filter Explorer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>RC Filter Explorer</h1>
+    <p class="lede">A resistor and a capacitor make a first-order filter. Drag R and C and watch the corner frequency,
+      the −20 dB/decade roll-off, the phase shift, and the step response change. The step response and the
+      frequency response are the same filter, seen in the time domain and the frequency domain.</p>
+  </header>
+
+  <div class="card">
+    <svg viewBox="0 0 520 120" role="img" aria-label="RC filter schematic">
+      <g stroke="currentColor" fill="none" stroke-width="2" style="color:var(--ink)">
+        <circle cx="30" cy="60" r="4" fill="currentColor"/>
+        <line x1="34" y1="60" x2="90" y2="60"/>
+        <path id="rpath" d="M90 60 l8 -12 l16 24 l16 -24 l16 24 l16 -24 l16 24 l8 -12"/>
+        <line x1="186" y1="60" x2="300" y2="60"/>
+        <line x1="250" y1="60" x2="250" y2="80"/>
+        <line x1="232" y1="80" x2="268" y2="80"/><line x1="232" y1="90" x2="268" y2="90"/>
+        <line x1="250" y1="90" x2="250" y2="108"/>
+        <line x1="236" y1="108" x2="264" y2="108"/>
+        <circle cx="304" cy="60" r="4" fill="currentColor"/>
+      </g>
+      <text x="10" y="45" font-size="14" id="lbl-in">Vin</text>
+      <text x="126" y="36" font-size="14" text-anchor="middle" id="lbl-r">R</text>
+      <text x="278" y="90" font-size="14" id="lbl-c">C</text>
+      <text x="314" y="65" font-size="14" id="lbl-out">Vout</text>
+      <text x="360" y="50" font-size="13" fill="var(--muted)">Low-pass: output across C</text>
+      <text x="360" y="72" font-size="13" fill="var(--muted)">f_c = 1 / (2πRC)</text>
+    </svg>
+    <div class="controls">
+      <label>Resistance R <span class="val" id="rv"></span>
+        <input type="range" id="r" min="1" max="6" step="0.01" value="3"></label>
+      <label>Capacitance C <span class="val" id="cv"></span>
+        <input type="range" id="c" min="-12" max="-5" step="0.01" value="-8"></label>
+      <label>Type
+        <select id="type"><option value="lp">Low-pass (output across C)</option><option value="hp">High-pass (output across R)</option></select></label>
+    </div>
+    <div class="readout">
+      <div>Corner f_c<b id="fc"></b></div>
+      <div>Time constant τ = RC<b id="tau"></b></div>
+      <div>Noise bandwidth (π/2·f_c)<b id="enbw"></b></div>
+      <div>16-bit settling (≈11τ)<b id="settle"></b></div>
+    </div>
+  </div>
+
+  <div class="card"><h2 style="margin-top:0">Magnitude (dB)</h2><canvas id="mag"></canvas></div>
+  <div class="two-col">
+    <div class="card"><h2 style="margin-top:0">Phase (°)</h2><canvas id="ph"></canvas></div>
+    <div class="card"><h2 style="margin-top:0">Step response</h2><canvas id="step"></canvas></div>
+  </div>
+
+  <div class="insight"><b>First principles.</b> The capacitor's impedance 1/(2πfC) falls as frequency rises. The filter is a
+    voltage divider between R and Z_C. At f_c the two magnitudes are equal, so |Vout/Vin| = 1/√2 (−3 dB) and the phase is −45°.
+    One decade above f_c, Z_C is 10× smaller, so the output is 10× smaller: −20 dB/decade.</div>
+  <div class="insight warn"><b>Where you meet this on a PCB:</b> ADC anti-alias filters, the R_series × C_trace
+    that slows every digital edge (τ = R_driver × C_load), reset-pin RC delays, and the RC "snubber" damping a switch node.</div>
+</main>
+<script src="plot.js"></script>
+<script>
+const { Plot, fmt, logspace, linspace, onTheme } = PCB;
+const $ = id => document.getElementById(id);
+const mag = new Plot($('mag'), { xLog: true, xRange: [1, 1e9], yRange: [-80, 5], xLabel: 'Frequency (Hz)', yLabel: 'Gain (dB)', aspect: 0.38 });
+const ph = new Plot($('ph'), { xLog: true, xRange: [1, 1e9], yRange: [-90, 90], xLabel: 'Frequency (Hz)', yLabel: 'Phase (°)', aspect: 0.6 });
+const st = new Plot($('step'), { xRange: [0, 5], yRange: [0, 1.1], xLabel: 'time / τ', yLabel: 'Vout / Vstep', aspect: 0.6 });
+
+function draw() {
+  const R = Math.pow(10, +$('r').value), C = Math.pow(10, +$('c').value), hp = $('type').value === 'hp';
+  const fc = 1 / (2 * Math.PI * R * C), tau = R * C;
+  $('rv').textContent = fmt(R) + 'Ω'; $('cv').textContent = fmt(C) + 'F';
+  $('fc').textContent = fmt(fc) + 'Hz'; $('tau').textContent = fmt(tau) + 's';
+  $('enbw').textContent = hp ? '—' : fmt(fc * Math.PI / 2) + 'Hz'; $('settle').textContent = fmt(11 * tau) + 's';
+
+  const f = logspace(1, 1e9, 500);
+  const g = f.map(x => { const r = x / fc; return hp ? 20 * Math.log10(r / Math.sqrt(1 + r * r)) : -10 * Math.log10(1 + r * r); });
+  const p = f.map(x => { const a = Math.atan(x / fc) * 180 / Math.PI; return hp ? 90 - a : -a; });
+  // asymptotes
+  const asym = f.map(x => hp ? Math.min(0, 20 * Math.log10(x / fc)) : Math.min(0, -20 * Math.log10(x / fc)));
+
+  mag.clear(); mag.axes();
+  mag.line(f, asym, '--muted', 1, [4, 4]);
+  mag.hline(-3, '--accent-2', [3, 3], '−3 dB');
+  mag.vline(fc, '--accent-2', [3, 3], 'f_c');
+  mag.line(f, g, '--accent', 2.5);
+  mag.dot(fc, -3.01, '--accent-2');
+
+  ph.clear(); ph.axes(); ph.vline(fc, '--accent-2'); ph.line(f, p, '--accent', 2.5);
+
+  const t = linspace(0, 5, 300);
+  st.clear(); st.axes();
+  st.hline(0.632, '--muted', [3, 3], hp ? '' : '63% at 1τ');
+  st.line(t, t.map(x => hp ? Math.exp(-x) : 1 - Math.exp(-x)), '--accent', 2.5);
+}
+['r', 'c', 'type'].forEach(id => $(id).addEventListener('input', draw));
+[mag, ph, st].forEach(p => p.onResize = draw);
+onTheme(draw);
+draw();
+</script>
+</body>
+</html>

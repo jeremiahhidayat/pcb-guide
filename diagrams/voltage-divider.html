@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voltage Divider Lab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>Voltage Divider Lab</h1>
+    <p class="lede">The textbook divider formula assumes nothing is connected to the output. Add a load, add resistor tolerance,
+      and see how far the real output moves. This is the Thevenin model in practice.</p>
+  </header>
+
+  <div class="card two-col">
+    <svg viewBox="0 0 320 300" role="img" aria-label="Divider schematic with load">
+      <g stroke="var(--ink)" fill="none" stroke-width="2">
+        <line x1="60" y1="30" x2="160" y2="30"/>
+        <line x1="160" y1="30" x2="160" y2="60"/>
+        <rect x="148" y="60" width="24" height="60" rx="3"/>
+        <line x1="160" y1="120" x2="160" y2="170"/>
+        <rect x="148" y="170" width="24" height="60" rx="3"/>
+        <line x1="160" y1="230" x2="160" y2="270"/>
+        <line x1="160" y1="145" x2="260" y2="145"/>
+        <line x1="260" y1="145" x2="260" y2="170"/>
+        <rect id="loadbox" x="248" y="170" width="24" height="60" rx="3" stroke="var(--accent-2)"/>
+        <line x1="260" y1="230" x2="260" y2="270"/>
+        <line x1="60" y1="270" x2="260" y2="270"/>
+        <line x1="60" y1="30" x2="60" y2="130"/><line x1="60" y1="170" x2="60" y2="270"/>
+        <circle cx="60" cy="150" r="20"/>
+      </g>
+      <text x="52" y="146" font-size="13">+</text><text x="54" y="162" font-size="13">−</text>
+      <text x="16" y="154" font-size="13">Vin</text>
+      <text x="182" y="95" font-size="13">R1</text>
+      <text x="182" y="205" font-size="13">R2</text>
+      <text x="280" y="205" font-size="13" fill="var(--accent-2)">R_load</text>
+      <circle cx="160" cy="145" r="4" fill="var(--accent)"/>
+      <text x="196" y="138" font-size="13" fill="var(--accent)">Vout</text>
+      <text x="150" y="292" font-size="12" fill="var(--muted)">GND</text>
+    </svg>
+    <div>
+      <div class="controls">
+        <label>Vin <span class="val" id="vinv"></span><input type="range" id="vin" min="1" max="48" step="0.1" value="12"></label>
+        <label>R1 (top) <span class="val" id="r1v"></span><input type="range" id="r1" min="2" max="7" step="0.01" value="4.5"></label>
+        <label>R2 (bottom) <span class="val" id="r2v"></span><input type="range" id="r2" min="2" max="7" step="0.01" value="4"></label>
+        <label>R_load (ADC/meter input) <span class="val" id="rlv"></span><input type="range" id="rl" min="3" max="10" step="0.01" value="10"></label>
+        <label>Resistor tolerance
+          <select id="tol"><option value="0.001">0.1%</option><option value="0.01" selected>1%</option><option value="0.05">5%</option></select></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div>Ideal (unloaded) Vout<b id="ideal"></b></div>
+    <div>Loaded Vout<b id="loaded"></b></div>
+    <div>Loading error<b id="lerr"></b></div>
+    <div>Thevenin R (R1‖R2)<b id="rth"></b></div>
+    <div>Worst-case range (tolerance)<b id="wc"></b></div>
+    <div>Divider current / power<b id="pw"></b></div>
+  </div>
+
+  <div class="card"><h2 style="margin-top:0">Vout vs load resistance</h2><canvas id="plot"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Loaded Vout</span><span><i style="background:var(--accent-2)"></i>Current R_load</span><span><i style="background:var(--muted)"></i>Ideal</span></div>
+  </div>
+
+  <div class="insight"><b>Rule of thumb:</b> to keep loading error below 0.1%, R_load must be about 1000× the Thevenin resistance R1‖R2.
+    A SAR ADC's input also needs charge at every sample. Put a capacitor (≈ 10–100 nF) from Vout to GND so it acts as a charge reservoir.</div>
+  <div class="insight warn"><b>Worst case vs. typical:</b> worst case assumes R1 at +tol and R2 at −tol (or vice versa). Statistically that's
+    unlikely. See <code>tools/tolerance_montecarlo.py</code> for the distribution you'd actually see across a batch of boards.</div>
+</main>
+<script src="plot.js"></script>
+<script>
+const { Plot, fmt, logspace, onTheme } = PCB;
+const $ = id => document.getElementById(id);
+const plot = new Plot($('plot'), { xLog: true, xRange: [1e3, 1e10], yRange: [0, 1], xLabel: 'R_load (Ω)', yLabel: 'Vout (V)', aspect: 0.38 });
+function div(vin, r1, r2, rl) { const r2p = rl ? r2 * rl / (r2 + rl) : r2; return vin * r2p / (r1 + r2p); }
+function draw() {
+  const vin = +$('vin').value, r1 = 10 ** +$('r1').value, r2 = 10 ** +$('r2').value, rl = 10 ** +$('rl').value, tol = +$('tol').value;
+  $('vinv').textContent = vin.toFixed(1) + ' V'; $('r1v').textContent = fmt(r1) + 'Ω'; $('r2v').textContent = fmt(r2) + 'Ω'; $('rlv').textContent = fmt(rl) + 'Ω';
+  const ideal = div(vin, r1, r2), loaded = div(vin, r1, r2, rl);
+  const lo = div(vin, r1 * (1 + tol), r2 * (1 - tol), rl), hi = div(vin, r1 * (1 - tol), r2 * (1 + tol), rl);
+  $('ideal').textContent = ideal.toFixed(4) + ' V';
+  $('loaded').textContent = loaded.toFixed(4) + ' V';
+  $('lerr').textContent = ((loaded - ideal) / ideal * 100).toFixed(3) + ' %';
+  $('rth').textContent = fmt(r1 * r2 / (r1 + r2)) + 'Ω';
+  $('wc').textContent = lo.toFixed(3) + ' – ' + hi.toFixed(3) + ' V';
+  const i = vin / (r1 + r2);
+  $('pw').textContent = fmt(i) + 'A / ' + fmt(i * vin) + 'W';
+  plot.o.yRange = [0, Math.max(0.1, ideal * 1.15)];
+  const x = logspace(1e3, 1e10, 300);
+  plot.clear(); plot.axes();
+  plot.hline(ideal, '--muted', [5, 4], 'ideal ' + ideal.toFixed(3) + ' V');
+  plot.vline(rl, '--accent-2', [3, 3], 'R_load');
+  plot.line(x, x.map(r => div(vin, r1, r2, r)), '--accent', 2.5);
+  plot.dot(rl, loaded, '--accent-2', 5);
+}
+['vin', 'r1', 'r2', 'rl', 'tol'].forEach(id => $(id).addEventListener('input', draw));
+plot.onResize = draw; onTheme(draw); draw();
+</script>
+</body>
+</html>

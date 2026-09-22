@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buck Converter Hot Loop</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .loop { fill: none; stroke-width: 5; stroke-linejoin: round; opacity: 0; transition: opacity .25s; }
+  .show .loop.on { opacity: .85; }
+  .comp { fill: var(--panel); stroke: var(--ink); stroke-width: 2; }
+  .wire { stroke: var(--ink); stroke-width: 2; fill: none; }
+  .pad { fill: var(--copper); }
+  .pour { fill: var(--copper); opacity: .22; }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>The Buck Converter Hot Loop</h1>
+    <p class="lede">A synchronous buck alternates between two current loops. The inductor current is continuous, so it flows in both.
+      The part that <em>switches on and off abruptly</em> is the difference between the two loops: <b>C<sub>in</sub> → high-side FET → low-side FET → back to C<sub>in</sub></b>.
+      That hot loop carries very fast di/dt, so its area sets the voltage spikes (V = L·di/dt) and the magnetic emissions.</p>
+  </header>
+
+  <div class="card show" id="sch">
+    <div class="controls">
+      <button data-m="on">Phase 1: high-side ON</button>
+      <button data-m="off">Phase 2: low-side ON</button>
+      <button data-m="hot" class="primary">Difference = HOT LOOP</button>
+    </div>
+    <svg viewBox="0 0 760 300" role="img" aria-label="Buck converter schematic with current loops">
+      <!-- rails -->
+      <path class="wire" d="M40 60 H300 M300 60 V90 M300 150 V170 M300 170 H400 M470 170 H620 V200 M620 240 V260 M40 260 H620 M300 170 V185 M300 245 V260 M160 60 V120 M160 160 V260 M620 170 H720"/>
+      <!-- Cin -->
+      <line x1="140" y1="120" x2="180" y2="120" class="wire"/><line x1="140" y1="132" x2="180" y2="132" class="wire"/>
+      <path class="wire" d="M160 132 V160"/>
+      <text x="110" y="130" font-size="14">C_in</text>
+      <!-- High FET -->
+      <rect x="275" y="90" width="50" height="60" rx="6" class="comp"/><text x="300" y="125" font-size="13" text-anchor="middle">Q_H</text>
+      <!-- Low FET -->
+      <rect x="275" y="185" width="50" height="60" rx="6" class="comp"/><text x="300" y="220" font-size="13" text-anchor="middle">Q_L</text>
+      <!-- Inductor -->
+      <path class="wire" d="M400 170 q8 -18 17 0 q8 -18 17 0 q8 -18 17 0 q8 -18 19 0"/>
+      <text x="435" y="150" font-size="14" text-anchor="middle">L</text>
+      <!-- Cout -->
+      <line x1="600" y1="200" x2="640" y2="200" class="wire"/><line x1="600" y1="212" x2="640" y2="212" class="wire"/>
+      <path class="wire" d="M620 212 V240"/>
+      <text x="650" y="210" font-size="14">C_out</text>
+      <text x="20" y="54" font-size="14">V_IN</text><text x="700" y="160" font-size="14">V_OUT</text><text x="330" y="285" font-size="14">GND</text>
+      <text x="340" y="164" font-size="12" fill="var(--accent-2)">SW node</text>
+      <circle cx="300" cy="170" r="4" fill="var(--accent-2)"/>
+      <!-- loops -->
+      <path class="loop" id="l1" stroke="var(--accent)" d="M160 116 V66 H292 V164 H400 M470 164 H612 V252 H168 V168"/>
+      <path class="loop" id="l2" stroke="var(--good)" d="M308 252 V176 H400 M470 176 H628 V252 Z"/>
+      <path class="loop" id="hot" stroke="var(--bad)" d="M168 116 V68 H266 V252 H168 V166" />
+    </svg>
+    <div class="insight" id="expl"></div>
+  </div>
+
+  <h2>Layout: the same circuit, two placements</h2>
+  <div class="two-col">
+    <div class="card">
+      <h3 style="margin:0 0 6px;color:var(--good)">✔ Good: C_in right at VIN/PGND pins</h3>
+      <svg viewBox="0 0 360 260">
+        <rect x="20" y="20" width="320" height="220" class="pour" rx="6"/>
+        <text x="28" y="36" font-size="11" fill="var(--muted)">GND plane on L2 directly underneath</text>
+        <rect x="130" y="90" width="80" height="80" class="comp"/><text x="170" y="134" font-size="13" text-anchor="middle">Buck IC</text>
+        <rect x="120" y="96" width="10" height="14" class="pad"/><text x="84" y="107" font-size="11">VIN</text>
+        <rect x="120" y="146" width="10" height="14" class="pad"/><text x="80" y="157" font-size="11">PGND</text>
+        <rect x="210" y="120" width="10" height="20" class="pad"/><text x="224" y="118" font-size="11">SW</text>
+        <rect x="96" y="112" width="18" height="32" rx="2" class="comp"/><text x="70" y="132" font-size="11">C_in</text>
+        <path d="M114 118 H122 M114 140 H122" stroke="var(--copper)" stroke-width="5"/>
+        <rect x="235" y="110" width="50" height="40" rx="6" class="comp"/><text x="260" y="134" font-size="12" text-anchor="middle">L</text>
+        <path d="M220 130 H235" stroke="var(--copper)" stroke-width="8"/>
+        <path d="M108 116 H126 V152 H108 Z" fill="var(--bad)" opacity=".35"/>
+        <text x="40" y="215" font-size="12" fill="var(--bad)">Hot loop area ≈ 15 mm² → ~1 nH</text>
+      </svg>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 6px;color:var(--bad)">✘ Bad: C_in 15 mm away, loop via long traces</h3>
+      <svg viewBox="0 0 360 260">
+        <rect x="20" y="20" width="320" height="220" class="pour" rx="6"/>
+        <text x="28" y="36" font-size="11" fill="var(--muted)">GND plane on L2</text>
+        <rect x="170" y="90" width="80" height="80" class="comp"/><text x="210" y="134" font-size="13" text-anchor="middle">Buck IC</text>
+        <rect x="160" y="96" width="10" height="14" class="pad"/>
+        <rect x="160" y="146" width="10" height="14" class="pad"/>
+        <rect x="250" y="120" width="10" height="20" class="pad"/>
+        <rect x="40" y="180" width="18" height="32" rx="2" class="comp"/><text x="30" y="228" font-size="11">C_in</text>
+        <path d="M49 180 V103 H162" stroke="var(--copper)" stroke-width="4" fill="none"/>
+        <path d="M58 206 H120 V153 H162" stroke="var(--copper)" stroke-width="4" fill="none"/>
+        <rect x="275" y="110" width="50" height="40" rx="6" class="comp"/><text x="300" y="134" font-size="12" text-anchor="middle">L</text>
+        <path d="M260 130 H275" stroke="var(--copper)" stroke-width="8"/>
+        <path d="M49 103 H165 V153 H120 V206 H49 Z" fill="var(--bad)" opacity=".3"/>
+        <text x="130" y="232" font-size="12" fill="var(--bad)">Hot loop ≈ 120 mm² → ~10 nH</text>
+      </svg>
+    </div>
+  </div>
+  <div class="insight warn"><b>Consequence:</b> with 10 nH of hot-loop inductance and 2 A switching in 5 ns, V = L·di/dt = 10 nH × 0.4 A/ns = 4 V spikes on the switch node
+    and input rail. That means ringing, EMI failures, and possible FET overvoltage. Rule #1 of buck layout: <b>the small input capacitor goes as close as physically possible to
+    the VIN and PGND pins, on the same layer, with the GND plane directly beneath.</b></div>
+</main>
+<script>
+const EXPL = {
+  on: '<b>Phase 1 (Q_H on):</b> current flows from V_IN / C_in through Q_H, the SW node, and the inductor to the load, returning through ground to C_in.',
+  off: '<b>Phase 2 (Q_L on):</b> the inductor keeps current flowing (v = L·di/dt resists change). It now circulates through Q_L from ground. C_in is not in this loop.',
+  hot: '<b>Hot loop:</b> subtract phase 2 from phase 1. The inductor/output part is common to both and cancels, since its current is continuous. What remains carries a square-wave current with ns edges: C_in → Q_H → Q_L → C_in. <b>Minimize this loop area.</b>',
+};
+function mode(m) {
+  document.getElementById('l1').classList.toggle('on', m === 'on');
+  document.getElementById('l2').classList.toggle('on', m === 'off');
+  document.getElementById('hot').classList.toggle('on', m === 'hot');
+  document.getElementById('expl').innerHTML = EXPL[m];
+}
+document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => mode(b.dataset.m));
+mode('hot');
+</script>
+</body>
+</html>

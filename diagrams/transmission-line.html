@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transmission Line Reflections</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>Transmission Line Reflections &amp; Termination</h1>
+    <p class="lede">A driver (voltage step behind a source resistance R<sub>s</sub>) launches a wave into a 50 Ω line. At the far end, the load
+      reflects a fraction Γ<sub>L</sub> = (R<sub>L</sub>−Z<sub>0</sub>)/(R<sub>L</sub>+Z<sub>0</sub>). Back at the source, Γ<sub>s</sub> reflects it again.
+      Press play to watch the wave, then try the presets.</p>
+  </header>
+  <div class="card">
+    <div class="controls">
+      <label>Source resistance R_s (driver + series R) <span class="val" id="rsv"></span><input type="range" id="rs" min="0" max="150" step="1" value="15"></label>
+      <label>Load R_L <span class="val" id="rlv"></span><input type="range" id="rl" min="0" max="4" step="0.01" value="4"></label>
+      <label>Rise time / line delay <span class="val" id="trv"></span><input type="range" id="tr" min="0.02" max="4" step="0.01" value="0.1"></label>
+    </div>
+    <div class="controls">
+      <button data-p="unterm">Unterminated CMOS (R_s 15 Ω, open)</button>
+      <button data-p="series">Series-terminated (R_s = 50 Ω)</button>
+      <button data-p="parallel">Parallel-terminated (R_L = 50 Ω)</button>
+      <button data-p="short">Shorted end</button>
+      <button class="primary" id="play">▶ Play</button>
+    </div>
+    <div class="readout">
+      <div>Γ at load<b id="gl"></b></div>
+      <div>Γ at source<b id="gs"></b></div>
+      <div>Initial step on line<b id="v0"></b></div>
+      <div>Final (DC) voltage<b id="vf"></b></div>
+    </div>
+  </div>
+  <div class="card"><h2 style="margin-top:0">Voltage along the line (animated)</h2><canvas id="line"></canvas></div>
+  <div class="card"><h2 style="margin-top:0">Waveforms at source and load</h2><canvas id="wave"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>At load (receiver)</span><span><i style="background:var(--accent-2)"></i>At source (driver pin)</span></div>
+  </div>
+  <div class="insight"><b>Series termination:</b> with R_s = Z0, only half the step (0.5 V) launches. The open load reflects +100%, doubling it to 1 V exactly at the receiver.
+    The reflection returns to a matched source and is absorbed. The source pin shows a half-voltage "shelf" for one round trip, so this only works for loads at the <em>end</em> of the line.</div>
+  <div class="insight warn"><b>Unterminated:</b> a strong CMOS driver (≈15 Ω) plus an open end rings: overshoot ~50% above the rail, then ringing that decays over many round trips.
+    With faster edges or an inductive load, the ringing can dip back through the logic threshold (false clocking). Increase the rise time to see why slow edges hide the problem on short traces.</div>
+</main>
+<script src="plot.js"></script>
+<script>
+const { Plot, onTheme } = PCB;
+const $ = id => document.getElementById(id);
+const Z0 = 50, N = 120, VS = 1;
+const lp = new Plot($('line'), { xRange: [0, 1], yRange: [-0.6, 2.0], xLabel: 'Position along line (0 = driver, 1 = load)', yLabel: 'V', aspect: 0.3 });
+const wp = new Plot($('wave'), { xRange: [0, 12], yRange: [-0.6, 2.0], xLabel: 'Time (in units of one-way line delay T_D)', yLabel: 'V', aspect: 0.35 });
+const rlOf = v => v >= 3.99 ? Infinity : v <= 0.001 ? 0 : 10 ** (v) / 10; // slider → 0.1 Ω … 1 kΩ, top = open
+function params() {
+  const Rs = +$('rs').value, RL = rlOf(+$('rl').value), tr = +$('tr').value;
+  const gs = (Rs - Z0) / (Rs + Z0), gl = RL === Infinity ? 1 : (RL - Z0) / (RL + Z0);
+  return { Rs, RL, tr, gs, gl, tau: Z0 / (Rs + Z0) };
+}
+// Simulate forward/backward waves on an N-cell lossless line. One cell = T_D/N.
+function simulate(p, steps) {
+  let F = new Float64Array(N), B = new Float64Array(N);
+  const snaps = [], vS = [], vL = [];
+  for (let k = 0; k < steps; k++) {
+    const t = k / N; // in units of T_D
+    const vs = VS * Math.min(1, Math.max(0, t / p.tr));
+    const nF = new Float64Array(N), nB = new Float64Array(N);
+    for (let i = N - 1; i > 0; i--) nF[i] = F[i - 1];
+    for (let i = 0; i < N - 1; i++) nB[i] = B[i + 1];
+    nF[0] = p.tau * vs + p.gs * B[0];
+    nB[N - 1] = p.gl * F[N - 1];
+    F = nF; B = nB;
+    vS.push(F[0] + B[0]); vL.push(F[N - 1] + B[N - 1]);
+    if (k % 2 === 0) snaps.push(Array.from(F, (f, i) => f + B[i]));
+  }
+  return { snaps, vS, vL };
+}
+let sim, frame = 0, anim = null;
+function staticDraw() {
+  const p = params();
+  $('rsv').textContent = p.Rs + ' Ω';
+  $('rlv').textContent = p.RL === Infinity ? 'open (CMOS input)' : p.RL.toFixed(1) + ' Ω';
+  $('trv').textContent = p.tr.toFixed(2) + ' × T_D';
+  $('gl').textContent = p.gl.toFixed(2); $('gs').textContent = p.gs.toFixed(2);
+  $('v0').textContent = p.tau.toFixed(2) + ' V';
+  $('vf').textContent = (p.RL === Infinity ? 1 : p.RL / (p.RL + p.Rs)).toFixed(2) + ' V';
+  sim = simulate(p, 12 * N);
+  const t = sim.vS.map((_, k) => k / N);
+  wp.clear(); wp.axes(); wp.hline(1, '--muted', [4, 4], 'VDD'); wp.hline(0.5, '--muted', [2, 4], 'threshold');
+  wp.line(t, sim.vS, '--accent-2', 2); wp.line(t, sim.vL, '--accent', 2.5);
+  drawLine(sim.snaps.length - 1);
+}
+function drawLine(i) {
+  const s = sim.snaps[Math.min(i, sim.snaps.length - 1)];
+  const x = s.map((_, k) => k / (N - 1));
+  lp.clear(); lp.axes(); lp.hline(1, '--muted', [4, 4], 'VDD'); lp.line(x, s, '--accent', 3);
+  const ctx = lp.ctx; ctx.fillStyle = PCB.css('--muted'); ctx.font = '12px system-ui';
+  ctx.textAlign = 'right'; ctx.fillText('t = ' + (i * 2 / N).toFixed(2) + ' T_D', lp.W - lp.o.pad.r - 8, lp.o.pad.t + 30);
+}
+$('play').onclick = () => {
+  cancelAnimationFrame(anim); frame = 0;
+  const tick = () => { drawLine(frame); frame += 1; if (frame < sim.snaps.length) anim = requestAnimationFrame(tick); };
+  tick();
+};
+document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+  const P = { unterm: [15, 4], series: [50, 4], parallel: [15, Math.log10(500)], short: [15, 0] }[b.dataset.p];
+  $('rs').value = P[0]; $('rl').value = P[1]; staticDraw(); $('play').click();
+});
+['rs', 'rl', 'tr'].forEach(id => $(id).addEventListener('input', staticDraw));
+lp.onResize = wp.onResize = staticDraw; onTheme(staticDraw); staticDraw();
+</script>
+</body>
+</html>

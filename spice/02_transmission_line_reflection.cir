@@ -1,0 +1,36 @@
+* 02_transmission_line_reflection.cir — Reflections on an unterminated vs series-terminated line (Chapter 16)
+* A 50-ohm line with 1 ns delay (~150 mm of FR-4 microstrip) driven by a 1 ns-edge CMOS driver (Rout = 15 ohm)
+* into a CMOS input (2 pF). Compare three source-termination values.
+* Run: ngspice 02_transmission_line_reflection.cir
+
+.param rser=0
+
+* Case A: unterminated (Rout 15 ohm only)
+VA a_src 0 PULSE(0 3.3 1n 0.5n 0.5n 20n 40n)
+RA_out a_src a_drv 15
+TA a_drv 0 a_load 0 Z0=50 TD=1n
+CA a_load 0 2p
+
+* Case B: series termination — 15 ohm driver + 33 ohm resistor ≈ 50 ohm
+VB b_src 0 PULSE(0 3.3 1n 0.5n 0.5n 20n 40n)
+RB_out b_src b_x 15
+RB_ser b_x b_drv 33
+TB b_drv 0 b_load 0 Z0=50 TD=1n
+CB b_load 0 2p
+
+* Case C: parallel (end) termination — 50 ohm to ground at load (note: halves the DC level with a 15 ohm driver... see DC!)
+VC c_src 0 PULSE(0 3.3 1n 0.5n 0.5n 20n 40n)
+RC_out c_src c_drv 15
+TC c_drv 0 c_load 0 Z0=50 TD=1n
+RC_term c_load 0 50
+CC c_load 0 2p
+
+.control
+  tran 10p 25n
+  plot v(a_load) v(b_load) v(c_load) title 'Receiver: unterminated / series / parallel'
+  plot v(a_drv) v(b_drv) title 'Driver pin: note the half-voltage shelf with series termination'
+  meas tran overshoot_A MAX v(a_load) FROM=0 TO=10n
+  meas tran overshoot_B MAX v(b_load) FROM=0 TO=10n
+  echo "Unterminated overshoot should be ~5 V (> 3.3 V rail!); series-terminated ~3.3 V"
+.endc
+.end

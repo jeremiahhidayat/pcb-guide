@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCB Fabrication Process</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .stepnav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .stepnav button { font: inherit; font-size: 13px; padding: 5px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  .stepnav button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #rule { font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>How a 4-Layer PCB Is Made</h1>
+    <p class="lede">Step through the process on a cross-section. Each step includes the <b>design rule it creates</b>, because every rule in
+      Altium's Design Rules dialog traces back to a step on this page.</p>
+  </header>
+  <div class="card">
+    <div class="stepnav" id="nav"></div>
+    <svg id="svg" viewBox="0 0 800 300" role="img" aria-label="PCB cross-section during fabrication"></svg>
+    <h2 id="title" style="margin-top:6px"></h2>
+    <p id="desc"></p>
+    <div class="insight" id="rule"></div>
+    <div class="controls"><button id="prev">← Previous</button><button id="next" class="primary">Next →</button></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const STEPS = [
+  { t: 'Start: copper-clad core', d: 'A fully cured glass-epoxy core with copper foil laminated on both sides becomes inner layers L2 and L3.',
+    r: 'Core thickness and copper weight are chosen in the Layer Stack Manager. Thicker copper needs wider minimum trace/space.', s: { core: 1, innerFull: 1 } },
+  { t: 'Inner-layer imaging', d: 'Photoresist is laminated on, exposed through the layer image (from your Gerber/ODB++ data), and developed. The resist remains where copper should stay.',
+    r: 'Your copper artwork is literally this photomask. Anything drawn on a copper layer becomes copper.', s: { core: 1, innerFull: 1, resist: 1 } },
+  { t: 'Etch and strip', d: 'Unprotected copper is etched away. The etchant also undercuts sideways, so fine features need thin copper and a width compensation.',
+    r: 'Minimum trace/space rules (e.g. 0.127 mm) come from etch resolution. Acid-trap and sliver rules come from etching too.', s: { core: 1, innerPat: 1 } },
+  { t: 'AOI + lay-up with prepreg and foil', d: 'Inner layers are optically inspected, oxide-treated, and stacked with prepreg sheets and outer copper foils.',
+    r: 'Prepreg thickness (with resin flow) sets outer-layer impedance. Layer-to-layer registration tolerance (~±75 µm) drives annular ring rules.', s: { core: 1, innerPat: 1, prepreg: 1, outerFoil: 1 } },
+  { t: 'Lamination', d: 'Heat and pressure melt the prepreg resin, which flows into gaps between inner traces and cures. Unbalanced copper warps the board here.',
+    r: 'Keep the stackup symmetric and copper roughly balanced to prevent bow and twist.', s: { core: 1, innerPat: 1, prepreg: 1, outerFoil: 1, laminated: 1 } },
+  { t: 'Drilling', d: 'Holes are mechanically drilled through the stack (laser for microvias). The drill can wander a little.',
+    r: 'Min drill size, aspect ratio (~8–10:1), hole-to-hole spacing, and annular ring (pad − drill)/2 all come from drilling.', s: { core: 1, innerPat: 1, prepreg: 1, outerFoil: 1, laminated: 1, holes: 1 } },
+  { t: 'Desmear, electroless Cu, pattern plating', d: 'Hole walls are cleaned and seeded with a thin chemical copper layer, then electroplated (~25 µm) along with the outer traces.',
+    r: 'Outer layers end up thicker than the base foil. Impedance calculators need the final plated thickness. Plating also sets via current capacity.', s: { core: 1, innerPat: 1, prepreg: 1, outerFoil: 1, laminated: 1, holes: 1, plated: 1 } },
+  { t: 'Outer-layer etch', d: 'Outer-layer pattern is etched, leaving traces, pads, and plated holes.',
+    r: 'Outer-layer trace/space minimums are often larger than inner because of the extra plating thickness.', s: { core: 1, innerPat: 1, prepreg: 1, laminated: 1, holes: 1, plated: 1, outerPat: 1 } },
+  { t: 'Solder mask', d: 'Liquid photoimageable mask is coated, exposed, and developed to open pads. Vias can be covered ("tented").',
+    r: 'Solder Mask Expansion and Minimum Solder Mask Sliver rules come from mask registration and resolution (~0.1 mm web minimum).', s: { core: 1, innerPat: 1, prepreg: 1, laminated: 1, holes: 1, plated: 1, outerPat: 1, mask: 1 } },
+  { t: 'Surface finish + silkscreen', d: 'Exposed copper gets a finish (ENIG shown in gold) that protects it and makes it solderable. The legend is printed.',
+    r: 'Silk-to-mask clearance rule: silkscreen is clipped off pads. Minimum silk line width/text height come from the printer.', s: { core: 1, innerPat: 1, prepreg: 1, laminated: 1, holes: 1, plated: 1, outerPat: 1, mask: 1, finish: 1 } },
+  { t: 'Electrical test + routing', d: 'A flying probe or bed-of-nails tests every net against your netlist (IPC-D-356), then the board outline is routed or V-scored out of the panel.',
+    r: 'Board-edge clearance for copper (≥ 0.3 mm) and minimum inside-corner radius (router bit ~2 mm) come from this step.', s: { core: 1, innerPat: 1, prepreg: 1, laminated: 1, holes: 1, plated: 1, outerPat: 1, mask: 1, finish: 1, routed: 1 } },
+];
+let i = 0;
+function el(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); (p || $('svg')).appendChild(e); return e; }
+function draw() {
+  const S = STEPS[i].s, svg = $('svg'); svg.innerHTML = '';
+  const X0 = S.routed ? 90 : 40, X1 = S.routed ? 710 : 760;
+  const traces = [[120, 60], [260, 40], [420, 60], [560, 40], [650, 30]];
+  const holes = [[200, 22], [500, 22]];
+  const y = { top: 50, pre1: 62, l2: 120, core: 132, l3: 190, pre2: 202, bot: 250 };
+  if (S.prepreg) { el('rect', { x: X0, y: y.pre1, width: X1 - X0, height: 58, fill: 'var(--prepreg)' }); el('rect', { x: X0, y: y.pre2, width: X1 - X0, height: 48, fill: 'var(--prepreg)' }); }
+  if (S.core) el('rect', { x: X0, y: y.core, width: X1 - X0, height: 58, fill: 'var(--fr4)' });
+  const inner = (yy) => {
+    if (S.innerFull) el('rect', { x: X0, y: yy, width: X1 - X0, height: 12, fill: 'var(--copper)' });
+    if (S.innerPat) traces.forEach(([x, w]) => el('rect', { x, y: yy, width: w, height: 12, fill: 'var(--copper)' }));
+  };
+  inner(y.l2); inner(y.l3 - 0);
+  if (S.resist) traces.forEach(([x, w]) => { el('rect', { x, y: y.l2 - 8, width: w, height: 8, fill: 'var(--accent)', opacity: .7 }); el('rect', { x, y: y.l3 + 12, width: w, height: 8, fill: 'var(--accent)', opacity: .7 }); });
+  if (S.outerFoil) { el('rect', { x: X0, y: y.top, width: X1 - X0, height: 12, fill: 'var(--copper)' }); el('rect', { x: X0, y: y.bot, width: X1 - X0, height: 12, fill: 'var(--copper)' }); }
+  if (S.outerPat) [[180, 60], [480, 60], [620, 50]].forEach(([x, w]) => { el('rect', { x, y: y.top, width: w, height: 14, fill: 'var(--copper)' }); el('rect', { x, y: y.bot - 2, width: w, height: 14, fill: 'var(--copper)' }); });
+  if (S.holes) holes.forEach(([x, w]) => {
+    el('rect', { x, y: y.top - 2, width: w, height: y.bot + 16 - y.top, fill: 'var(--panel)' });
+    if (S.plated) { el('rect', { x, y: y.top - 2, width: 4, height: y.bot + 16 - y.top, fill: 'var(--copper)' }); el('rect', { x: x + w - 4, y: y.top - 2, width: 4, height: y.bot + 16 - y.top, fill: 'var(--copper)' }); }
+  });
+  if (S.mask) {
+    el('rect', { x: X0, y: y.top - 8, width: X1 - X0, height: 8, fill: 'var(--mask)', opacity: .9 });
+    el('rect', { x: X0, y: y.bot + 12, width: X1 - X0, height: 8, fill: 'var(--mask)', opacity: .9 });
+    [[185, 50], [485, 50]].forEach(([x, w]) => { el('rect', { x, y: y.top - 8, width: w, height: 8, fill: 'var(--panel)' }); el('rect', { x, y: y.bot + 12, width: w, height: 8, fill: 'var(--panel)' }); });
+  }
+  if (S.finish) [[185, 50], [485, 50]].forEach(([x, w]) => { el('rect', { x, y: y.top - 4, width: w, height: 4, fill: '#d4af37' }); el('rect', { x, y: y.bot + 14, width: w, height: 4, fill: '#d4af37' }); });
+  if (S.finish) { const t = el('text', { x: 630, y: y.top - 14, 'font-size': 12, fill: 'var(--muted)' }); t.textContent = 'U1 ▢'; }
+  const lab = (txt, yy) => { const t = el('text', { x: 6, y: yy, 'font-size': 11, fill: 'var(--muted)' }); t.textContent = txt; };
+  if (S.outerFoil || S.outerPat) lab('L1', y.top + 10); lab('L2', y.l2 + 10); lab('L3', y.l3 + 10); if (S.outerFoil || S.outerPat) lab('L4', y.bot + 10);
+  $('title').textContent = `Step ${i + 1} of ${STEPS.length}: ${STEPS[i].t}`;
+  $('desc').textContent = STEPS[i].d; $('rule').innerHTML = '<b>Design rule born here:</b> ' + STEPS[i].r;
+  document.querySelectorAll('#nav button').forEach((b, k) => b.classList.toggle('on', k === i));
+}
+STEPS.forEach((s, k) => { const b = document.createElement('button'); b.textContent = k + 1; b.title = s.t; b.onclick = () => { i = k; draw(); }; $('nav').appendChild(b); });
+$('prev').onclick = () => { i = Math.max(0, i - 1); draw(); };
+$('next').onclick = () => { i = Math.min(STEPS.length - 1, i + 1); draw(); };
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edges and Harmonics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header class="page">
+    <a class="back" href="index.html">← All diagrams</a>
+    <h1>Edges, Not Clock Rate, Set Your Bandwidth</h1>
+    <p class="lede">A digital signal is a sum of sine-wave harmonics. The spectrum envelope falls at −20 dB/decade above
+      1/(πt<sub>pw</sub>), then at −40 dB/decade above 1/(πt<sub>r</sub>). Slow the clock and the first corner moves.
+      Only slowing the <em>edge</em> moves the second one, and that corner is what drives ringing, crosstalk, and EMI.</p>
+  </header>
+
+  <div class="card">
+    <div class="controls">
+      <label>Clock frequency <span class="val" id="fv"></span><input type="range" id="f" min="5" max="8.5" step="0.01" value="7"></label>
+      <label>Rise/fall time t_r <span class="val" id="trv"></span><input type="range" id="tr" min="-10.5" max="-7.5" step="0.01" value="-9"></label>
+      <label>Harmonics summed (time plot) <span class="val" id="nv"></span><input type="range" id="n" min="1" max="199" step="2" value="41"></label>
+    </div>
+    <div class="readout">
+      <div>Knee (0.35/t_r)<b id="knee"></b></div>
+      <div>Second corner 1/(πt_r)<b id="c2"></b></div>
+      <div>Harmonic # at knee<b id="hk"></b></div>
+      <div>Edge length on FR-4 (ε_eff 3)<b id="el"></b></div>
+    </div>
+  </div>
+  <div class="card"><h2 style="margin-top:0">Time domain (one period)</h2><canvas id="time"></canvas></div>
+  <div class="card"><h2 style="margin-top:0">Spectrum (odd harmonics, dB relative to amplitude)</h2><canvas id="spec"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Harmonic amplitudes</span><span><i style="background:var(--accent-2)"></i>Envelope asymptotes</span></div>
+  </div>
+  <div class="insight"><b>Try this:</b> set the clock to 1 MHz and t_r to 0.5 ns. Energy still reaches hundreds of MHz. Now raise
+    t_r to 5 ns: the high-frequency content drops by ~20 dB. That's why a series resistor or a lower GPIO drive strength setting fixes EMI
+    without changing the clock.</div>
+</main>
+<script src="plot.js"></script>
+<script>
+const { Plot, fmt, linspace, onTheme } = PCB;
+const $ = id => document.getElementById(id);
+const tp = new Plot($('time'), { xRange: [0, 1], yRange: [-0.25, 1.25], xLabel: 't / T', yLabel: 'V (normalized)', aspect: 0.32 });
+const sp = new Plot($('spec'), { xLog: true, xRange: [1e5, 1e11], yRange: [-100, 0], xLabel: 'Frequency (Hz)', yLabel: 'dB', aspect: 0.4 });
+const sinc = x => x === 0 ? 1 : Math.sin(x) / x;
+function draw() {
+  const f = 10 ** +$('f').value, tr = 10 ** +$('tr').value, N = +$('n').value, T = 1 / f;
+  const trEff = Math.min(tr, T / 2.2);
+  $('fv').textContent = fmt(f) + 'Hz'; $('trv').textContent = fmt(tr) + 's'; $('nv').textContent = N;
+  $('knee').textContent = fmt(0.35 / tr) + 'Hz'; $('c2').textContent = fmt(1 / (Math.PI * tr)) + 'Hz';
+  $('hk').textContent = Math.round(0.35 / tr / f); $('el').textContent = (tr * 3e8 / Math.sqrt(3) * 1e3).toFixed(1) + ' mm';
+
+  // Trapezoid, 50% duty, amplitude 1 (0→1). c_n = d·sinc(nπd)·sinc(nπ tr/T) (one-sided: ×2)
+  const t = linspace(0, 1, 800);
+  const v = t.map(x => {
+    let s = 0.5;
+    for (let n = 1; n <= N; n += 2) s += 2 * 0.5 * sinc(n * Math.PI * 0.5) * sinc(n * Math.PI * trEff / T) * Math.cos(2 * Math.PI * n * (x - 0.25));
+    return s;
+  });
+  tp.clear(); tp.axes(); tp.line(t, v, '--accent', 2);
+
+  sp.clear(); sp.axes();
+  const c1 = 1 / (Math.PI * T / 2), c2 = 1 / (Math.PI * trEff);
+  const ctx = sp.ctx;
+  sp.clip(() => {
+    ctx.strokeStyle = PCB.css('--accent'); ctx.lineWidth = 1.5;
+    // Draw every odd harmonic at first, then thin out (even step keeps n odd) so dense spectra stay fast.
+    for (let n = 1; n * f <= 1e11; n += (n < 300 ? 2 : 2 * Math.ceil(n / 300))) {
+      const a = 2 * 0.5 * Math.abs(sinc(n * Math.PI * 0.5) * sinc(n * Math.PI * trEff / T));
+      const db = 20 * Math.log10(a + 1e-12), x = sp.tx(n * f);
+      ctx.beginPath(); ctx.moveTo(x, sp.ty(-100)); ctx.lineTo(x, sp.ty(db)); ctx.stroke();
+    }
+  });
+  // envelope: flat (2d = 1 → 0 dB) until c1, −20 dB/dec until c2, −40 after
+  const fx = [1e5, c1, c2, 1e11];
+  const env = fx.map(x => x <= c1 ? 0 : x <= c2 ? -20 * Math.log10(x / c1) : -20 * Math.log10(c2 / c1) - 40 * Math.log10(x / c2));
+  sp.line(fx, env, '--accent-2', 2, [6, 4]);
+  sp.vline(c2, '--accent-2', [2, 3], '1/(πt_r)');
+}
+['f', 'tr', 'n'].forEach(id => $(id).addEventListener('input', draw));
+tp.onResize = sp.onResize = draw; onTheme(draw); draw();
+</script>
+</body>
+</html>

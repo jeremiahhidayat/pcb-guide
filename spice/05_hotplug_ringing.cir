@@ -1,0 +1,29 @@
+* 05_hotplug_ringing.cir — Hot-plugging a ceramic-only input through a cable (Chapter 11)
+* 24 V supply, 1 m cable (~1 uH, 50 mohm), board input: 10 uF ceramic (ESR 5 mohm).
+* The LC is barely damped: the input rings to nearly 2x Vin (~45 V!).
+* Adding a 47 uF electrolytic with ~0.5 ohm ESR damps it.
+* Run: ngspice 05_hotplug_ringing.cir
+
+* Switch closure modeled as a fast step at t = 10 us
+Vs1 s1 0 PULSE(0 24 10u 100n 100n 1 2)
+Rc1 s1 m1 0.05
+Lc1 m1 in1 1u
+Cin1 in1 e1 10u
+Resr1 e1 0 0.005
+
+Vs2 s2 0 PULSE(0 24 10u 100n 100n 1 2)
+Rc2 s2 m2 0.05
+Lc2 m2 in2 1u
+Cin2 in2 e2 10u
+Resr2 e2 0 0.005
+Cdamp in2 f2 47u
+Rdamp f2 0 0.5
+
+.control
+  tran 10n 100u
+  plot v(in1) v(in2) title 'Hot-plug: ceramic only vs with damping electrolytic'
+  meas tran vpk_ceramic MAX v(in1)
+  meas tran vpk_damped MAX v(in2)
+  echo "Compare peaks against your regulator's abs-max input voltage."
+.endc
+.end

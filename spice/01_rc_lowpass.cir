@@ -1,0 +1,21 @@
+* 01_rc_lowpass.cir — First-order RC low-pass filter (Chapter 1, 4)
+* Expect: -3 dB at f_c = 1/(2*pi*R*C) = 15.9 kHz, -45 deg phase, 63% of step after tau = 10 us.
+* Run: ngspice 01_rc_lowpass.cir
+
+V1 in 0 DC 0 AC 1 PULSE(0 1 10u 1n 1n 200u 400u)
+R1 in out 1k
+C1 out 0 10n
+
+.control
+  ac dec 50 10 10meg
+  let mag_db = vdb(out)
+  let phase_deg = 180/pi*vp(out)
+  meas ac f3db WHEN vdb(out)=-3.0103
+  plot mag_db ylabel 'dB'
+  plot phase_deg ylabel 'deg'
+  tran 0.1u 100u
+  meas tran t63 WHEN v(out)=0.632 RISE=1
+  plot v(in) v(out)
+  echo "Expected f3db = 15.9 kHz; expected t63 = 20 us (10 us pulse delay + 1 tau)"
+.endc
+.end
