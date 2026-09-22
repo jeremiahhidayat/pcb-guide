@@ -19,7 +19,7 @@
                                                DRC ─► Outputs (.OutJob): Gerber/ODB++, drill,
                                                        pick-place, BOM (.BomDoc), drawings (Draftsman)
 ```
-See [`diagrams/altium-design-flow.html`](../../diagrams/altium-design-flow.html).
+See [`diagrams/altium-design-flow.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/altium-design-flow.html).
 
 ## 7.2 Project anatomy
 

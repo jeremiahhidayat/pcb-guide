@@ -3,7 +3,7 @@
 > **Mentor's note:** The stackup is the foundation of SI, PI and EMC. You can't fix a bad stackup with good
 > routing. Decide it early, ideally together with your fab, and don't change it casually.
 
-👉 Visualize: [`diagrams/pcb-stackup.html`](../../diagrams/pcb-stackup.html).
+👉 Visualize: [`diagrams/pcb-stackup.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/pcb-stackup.html).
 
 ---
 

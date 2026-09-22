@@ -90,7 +90,7 @@ At 200 MHz: |Z| ≈ 2π × 200e6 × 0.5e-9 = 0.63 Ω   ← it's an inductor now
 Above ~20 MHz, a 100 nF cap behaves like a 0.5 nH inductor, and so does a 10 nF cap in the same
 package. **In the inductive region, ESL (package + mounting) decides everything; the capacitance value
 barely matters.** Chapter 14 builds a whole methodology on this. Try it in
-[`diagrams/decoupling-impedance.html`](../../diagrams/decoupling-impedance.html).
+[`diagrams/decoupling-impedance.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/decoupling-impedance.html).
 
 ### Dielectric types (the most under-appreciated datasheet section)
 

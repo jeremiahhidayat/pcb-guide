@@ -27,7 +27,7 @@ Supporting material:
 
 | Folder | Contents |
 |--------|----------|
-| [`diagrams/`](diagrams/) | **Interactive HTML diagrams** (open in a browser): RC filter Bode plots, return-current paths, transmission-line reflections, decoupling impedance, stackups, buck converter hot loops, and more. Start at [`diagrams/index.html`](diagrams/index.html), or view them live at **https://jeremiahhidayat.github.io/pcb-guide/diagrams/**. |
+| [`diagrams/`](diagrams/) | **Interactive HTML diagrams** (open in a browser): RC filter Bode plots, return-current paths, transmission-line reflections, decoupling impedance, stackups, buck converter hot loops, and more. **[Open them live](https://jeremiahhidayat.github.io/pcb-guide/diagrams/)**, or open `diagrams/index.html` locally. |
 | [`tools/`](tools/) | Python calculators: trace width (IPC-2221/2152), microstrip/stripline impedance, via parasitics, decoupling networks, tolerance Monte Carlo, thermal, buck converter design. |
 | [`spice/`](spice/) | ngspice / Altium Mixed-Sim netlists that let you *see* the concepts: ringing, reflections, capacitor anti-resonance, filter response. |
 | [`altium-scripts/`](altium-scripts/) | DelphiScript utilities for Altium (via reports, design-rule presets, etc.). |

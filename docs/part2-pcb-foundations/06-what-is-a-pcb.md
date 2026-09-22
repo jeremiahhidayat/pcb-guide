@@ -3,8 +3,8 @@
 > **Mentor's note:** Design gets easier once you picture how the board is *made*. Every design rule is
 > a fabrication limit or a physics limit. Learn the process and the rules stop feeling arbitrary.
 
-👉 Visual companions: [`diagrams/pcb-stackup.html`](../../diagrams/pcb-stackup.html) (layers, vias) and
-[`diagrams/pcb-fab-process.html`](../../diagrams/pcb-fab-process.html) (manufacturing steps).
+👉 Visual companions: [`diagrams/pcb-stackup.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/pcb-stackup.html) (layers, vias) and
+[`diagrams/pcb-fab-process.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/pcb-fab-process.html) (manufacturing steps).
 
 ---
 

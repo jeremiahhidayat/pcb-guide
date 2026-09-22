@@ -122,7 +122,7 @@ It acts as a charge reservoir for the sampling cap. This is one of the most comm
 and it only makes sense when you think about the load.
 
 See [`tools/tolerance_montecarlo.py`](../../tools/tolerance_montecarlo.py) for how resistor tolerance
-affects divider accuracy, and the interactive [`diagrams/voltage-divider.html`](../../diagrams/voltage-divider.html).
+affects divider accuracy, and the interactive [`diagrams/voltage-divider.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/voltage-divider.html).
 
 ---
 
@@ -197,8 +197,8 @@ A "slow" 10 MHz SPI clock driven by a modern MCU GPIO with 1 ns edges has spectr
 about **350 MHz**. **The board sees the edges, not the clock frequency.** A 1 MHz I²C bus from a
 modern fast-edged part can still ring and radiate like a 300 MHz signal. Chapter 16 builds on this.
 
-👉 Explore: [`diagrams/rc-filter.html`](../../diagrams/rc-filter.html) (interactive Bode plot) and
-[`diagrams/square-wave-harmonics.html`](../../diagrams/square-wave-harmonics.html).
+👉 Explore: [`diagrams/rc-filter.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/rc-filter.html) (interactive Bode plot) and
+[`diagrams/square-wave-harmonics.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/square-wave-harmonics.html).
 
 ### Decibels
 

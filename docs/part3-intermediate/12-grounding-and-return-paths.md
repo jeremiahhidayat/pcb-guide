@@ -30,7 +30,7 @@ Take a trace over a solid plane.
 The crossover frequency where inductance dominates (ωL > R) is surprisingly low: typically in the **kHz range**. So
 almost every digital signal edge (and switching regulator current) returns directly beneath its trace.
 
-👉 See it: [`diagrams/return-path.html`](../../diagrams/return-path.html). Toggle frequency and add a plane slot.
+👉 See it: [`diagrams/return-path.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/return-path.html). Toggle frequency and add a plane slot.
 
 ### What follows from this
 

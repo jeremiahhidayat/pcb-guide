@@ -46,7 +46,7 @@ boards need real PDN design.
 - **Plane pair capacitance:** a tight power/ground plane pair (thin dielectric) has very low inductance and covers hundreds of MHz.
 - **Package and die capacitance:** above roughly 200–500 MHz the PCB mostly can't help. The IC vendor designed that part.
 
-👉 Play with it: [`diagrams/decoupling-impedance.html`](../../diagrams/decoupling-impedance.html) and
+👉 Play with it: [`diagrams/decoupling-impedance.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/decoupling-impedance.html) and
 [`tools/decoupling_plot.py`](../../tools/decoupling_plot.py).
 
 ## 14.4 🧠 Mounted inductance: why placement beats value

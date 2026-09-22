@@ -99,7 +99,7 @@ Its di/dt is huge, so its inductance produces voltage spikes (V = L·di/dt) and 
    directly underneath.
 5. Put the inductor close to SW, and the output cap ground close to the input cap ground.
 
-👉 Interactive: [`diagrams/buck-hot-loop.html`](../../diagrams/buck-hot-loop.html) compares good and bad layouts.
+👉 Interactive: [`diagrams/buck-hot-loop.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/buck-hot-loop.html) compares good and bad layouts.
 
 ### Other topologies
 

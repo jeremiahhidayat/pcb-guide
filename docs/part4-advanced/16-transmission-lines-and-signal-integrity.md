@@ -4,8 +4,8 @@
 > travelling between a trace and its reference plane, and at every point it only knows the local impedance.**
 > Wherever that impedance changes, part of the wave reflects. Everything else in this chapter follows from that.
 
-👉 Interactive: [`diagrams/transmission-line.html`](../../diagrams/transmission-line.html) (reflections, termination),
-[`diagrams/square-wave-harmonics.html`](../../diagrams/square-wave-harmonics.html) (why edges matter).
+👉 Interactive: [`diagrams/transmission-line.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/transmission-line.html) (reflections, termination),
+[`diagrams/square-wave-harmonics.html`](https://jeremiahhidayat.github.io/pcb-guide/diagrams/square-wave-harmonics.html) (why edges matter).
 
 ---
 
