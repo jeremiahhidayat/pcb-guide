@@ -43,6 +43,7 @@ the datasheet's stability section, or choose a modern ceramic-stable LDO (e.g. T
 2. Place parts from your library (Chapter 9). Search Manufacturer Part Search for: USB-C receptacle 16-pin
    (e.g. GCT USB4105 / Hirose / Molex — pick one with good stock), TVS (e.g. `ESD5Z5V` / `SMF5.0A` on VBUS, low-C
    array on D+/D− if used), PTC (0.5–1 A hold), LDO, caps, LED, header, test points.
+   [Appendix E](../appendices/E-finding-parts.md) walks through the search, using this USB-C receptacle as its example.
 3. Wire it up following Chapter 8's style rules. Net labels: `VBUS`, `VBUS_F` (after fuse), `3V3`, `GND`, `CC1`, `CC2`.
 4. Add a **Parameter Set** directive with `ClassName = PWR` on `VBUS`, `VBUS_F`, `3V3`.
 5. **Project » Validate PCB Project**, and fix every warning.

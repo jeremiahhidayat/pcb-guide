@@ -5,6 +5,9 @@
 
 ---
 
+For a step-by-step distributor search workflow (filters, datasheet checks, CAD models), see
+[Appendix E — Finding Parts](../appendices/E-finding-parts.md).
+
 ## 27.1 Selection criteria (in order of how often they bite)
 1. **Availability:** stock at multiple distributors (Digi-Key, Mouser, Arrow, LCSC for JLC assembly), more than one manufacturer.
 2. **Lifecycle:** *Active*, not *NRND* (not recommended for new designs) or *EOL/Obsolete*.

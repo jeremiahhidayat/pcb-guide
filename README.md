@@ -21,7 +21,7 @@ physics that produces it, so that when you meet a situation no rule covers, you 
 | **[Part 3 — Intermediate Design](docs/part3-intermediate/)** | Power, grounding, layout, sensors | Design robust 2–4 layer mixed-signal boards for research instruments |
 | **[Part 4 — Advanced Design](docs/part4-advanced/)** | SI, PI, high-speed, EMC, RF, thermal | Design controlled-impedance, high-speed, low-noise boards |
 | **[Part 5 — Industry Practice](docs/part5-industry/)** | Reviews, DFM, bring-up, release | Work like a professional hardware team |
-| **[Appendices](docs/appendices/)** | Reference | Formula cheat sheet, Altium shortcuts, glossary, reading list |
+| **[Appendices](docs/appendices/)** | Reference | Formula cheat sheet, Altium shortcuts, glossary, reading list, part search workflow |
 
 Supporting material:
 
@@ -102,6 +102,7 @@ capacitor has inductance.
 - [B — Altium Shortcuts & Menu Map](docs/appendices/B-altium-shortcuts.md)
 - [C — Glossary](docs/appendices/C-glossary.md)
 - [D — Further Reading](docs/appendices/D-further-reading.md)
+- [E — Finding Parts: A Search Workflow](docs/appendices/E-finding-parts.md)
 
 ---
 

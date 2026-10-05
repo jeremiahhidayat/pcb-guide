@@ -25,6 +25,8 @@ Component (the thing on the BOM)
 | Ultra Librarian / SnapEDA / SamacSys (Component Search Engine) | ✔ | Convenient. Always review. Errors do happen |
 | Random GitHub libraries | ⚠️ | Review everything |
 
+To find the part itself (and its models), follow the search workflow in [Appendix E](../appendices/E-finding-parts.md).
+
 🏭 **Industry practice:** No part enters the company library until a second person checks it against
 the datasheet ("library review"). Record who created and who checked it (parameters `Author`, `Checker`).
 
