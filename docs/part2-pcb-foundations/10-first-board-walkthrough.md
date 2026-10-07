@@ -51,8 +51,8 @@ the datasheet's stability section, or choose a modern ceramic-stable LDO (e.g. T
 ```
  J1 USB-C                F1 PTC        U1 LDO
  VBUS ──┬───────────────[////]──┬────── IN   OUT ──┬──────┬─── 3V3 ──► J2, TP2
-        │ D1 TVS               │C1 10µ   GND      │C3 10µ│C4 100n
-        ▼                      │C2 100n   │       │      │   R1 680 ── LED D2 ── GND
+        │ D1 TVS                │C1 10µ   GND      │C3 10µ│C4 100n
+        ▼                       │C2 100n   │       │      │   R1 680 ── LED D2 ── GND
  CC1 ──[5.1k R2]── GND         GND       GND     GND    GND
  CC2 ──[5.1k R3]── GND
  GND/Shell ── GND   (shell via 1 MΩ ∥ 4.7 nF to GND is a common EMC practice; direct is fine for a first board)
